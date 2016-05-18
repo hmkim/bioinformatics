@@ -1,0 +1,14 @@
+24	TARGETSCAN-WORM	http://www.targetscan.org/cgi-bin/mirgene.cgi?mirg=<?>
+25	TARGETSCAN-VERT	http://www.targetscan.org/cgi-bin/mirgene.cgi?mirg=<?>
+26	MICRORNA.ORG	http://www.microrna.org/microrna/linkFromMirbase.do?mirbase=<?>
+27	DIANA-MICROT	http://diana.cslab.ece.ntua.gr/DianaTools/index.php?r=microt/results&threshold=0.3&mirnas=<?>
+28	TARGETSCAN-FLY	http://www.targetscan.org/cgi-bin/mirgene.cgi?mirg=<?>
+30	TARBASE	http://diana.imis.athena-innovation.gr/DianaTools/index.php?r=tarbase/index&mirnas=<?>
+31	MIRTARBASE	http://mirtarbase.mbc.nctu.edu.tw/php/search.php?q=search_exact&searchword=<?>
+32	MIRECORDS	http://mirecords.biolead.org/interactions.php?targetgene_type=refseq_acc&v=yes&mirna_acc=<?>
+33	MIRDB	http://mirdb.org/cgi-bin/search.cgi?searchType=miRNA&full=mirbase&searchBox=<?>
+42	RNA22-DME	http://cm.jefferson.edu/rna22v1.0-drosophila_melanogaster/InputController?mirbaseaccessionid=<?>
+41	RNA22-MMU	http://cm.jefferson.edu/rna22v1.0-mus_musculus/InputController?mirbaseaccessionid=<?>
+40	RNA22-HSA	http://cm.jefferson.edu/rna22v1.0-homo_sapiens/InputController?mirbaseaccessionid=<?>
+43	RNA22-CEL	http://cm.jefferson.edu/rna22v1.0-caenorhabditis_elegans/InputController?mirbaseaccessionid=<?>
+38	TARGETMINER	http://www.isical.ac.in/~bioinfo_miu/final_html_targetminer/<?>.html
