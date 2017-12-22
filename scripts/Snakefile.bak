@@ -1,0 +1,141 @@
+configfile: "config.yaml"
+
+import shutil
+import subprocess
+
+import glob, os
+
+
+# check tools
+assert shutil.which("vsearch")
+assert shutil.which("xtract")
+
+txid = (config["general"]["taxonomy_id"])
+gene_symbol = (config["general"]["keyword"])
+
+ident_vsearch = (config['vsearch']['ident'])
+
+features = ["gene", "CDS"]
+qualifiers = ["gene_synonym","gene","product"]
+
+rule all:
+    input:
+        "result/geneSynome.txt",
+        "data/down.gb",
+        "data/source_organism_strain.txt",
+        "msf/derep_sorted.msf",
+        "msf/down.pep.mafft",
+        "msf/down.dna.msf"
+
+rule clean:
+    run:
+        'rm geneSeqInfo.targetGene.vsearch.msf',
+        'rm geneSeqInfo.targetGene.fa'
+        'rm geneSeqInfo.targetGene.vsearch'
+
+rule collect_geneSynom:
+    output: "result/geneSynome.txt"
+    message: "Executing somecommand on the following files {input}."
+    shell: """python collect_geneSynom.py {txid} "{gene_symbol}" {output}"""
+
+rule collect_seqInfo:
+    input: rules.collect_geneSynom.output
+    output: "data/geneSeqInfo.txt"
+    message: "Executing somecommand with taxonomy id: {txid} and gene_symbol: {gene_symbol}."
+    shell: """python collect_seqInfo.py {txid} "{gene_symbol}" {output}"""
+
+rule collect_strainInfo:
+    input: rules.collect_seqInfo.output
+    output:
+        "data/source_organism_strain.txt"
+    shell: 
+        "cat {input} | xtract -insd source organism strain | grep . | sort -t $'\t' -u -k 2,3 > {output}" 
+
+rule xtract_each:
+    input: rules.collect_seqInfo.output
+    output:
+        "geneSeqInfo.{feature}.{qualifier}.txt"
+    shell:
+        "cat {input} | xtract -insd {wildcards.feature} {wildcards.qualifier} | grep . | sort > geneSeqInfo.{wildcards.feature}.{wildcards.qualifier}.txt"
+
+rule get_accList:
+    input: rules.collect_seqInfo.output
+    output: "data/acc.list"
+    params:
+        keyword = gene_symbol.replace('|','\|')
+    shell:
+        'cat {input} | xtract -pattern INSDSeq -ACCN INSDSeq_accession-version -group INSDFeature -match INSDFeature_key:CDS -pfx "\n" -element "&ACCN" -block INSDFeature -match INSDFeature_key:CDS -element INSDFeature_location -subset INSDQualifier -match INSDQualifier_name:codon_start -element INSDQualifier_value -subset INSDQualifier -match INSDQualifier_name:gene -element INSDQualifier_value -subset INSDQualifier -match INSDQualifier_name:product -element INSDQualifier_value | grep . | grep "	{params.keyword}	" > {output}'
+
+rule get_genBank:
+    input: rules.get_accList.output
+    output: "data/down.gb"
+    shell:
+        "cat {input} | cut -f1 | sort -u > data/down.acc\nperl ncbi_id2datas.pl data/down.acc {output} nucleotide gbwithparts" 
+
+#rule download_for_cds:
+#    https://github.com/nawrockie/esl-fetch-cds/blob/afe081b0bfb78920c6b4a8cbe102967b09e65f34/00NOTES.sh
+#    https://github.com/nawrockie/esl-fetch-cds/blob/afe081b0bfb78920c6b4a8cbe102967b09e65f34/esl-fetch-cds.pl
+
+rule extract_seq:
+    input: rules.get_genBank.output
+    output:
+        dna = "data/down.dna.fa",
+        pep = "data/down.pep.fa"
+    shell:
+        "python extract_CDS_from_genbank.py -i {input} -o {output.dna} -k '{gene_symbol}' -p {output.pep}"
+
+rule dereplicate:
+    input: rules.extract_seq.output.dna
+    output: "cluster/derep.fasta"
+    threads: config['vsearch']['thread']
+    message: "Dereplicating {input} with {threads} threads."
+    shell: "vsearch --threads {threads} --derep_fulllength {input} --output {output} --sizeout"
+
+rule remove_singletons:
+    input: rules.dereplicate.output
+    output: "cluster/derep_sorted.fasta"
+    threads: config['vsearch']['thread']
+    message: "Sorting and removing singletons from {input}"
+    shell: "vsearch --threads {threads} --sortbysize {input} --output {output} --minsize 2"
+
+rule clustalo:
+    input: rules.remove_singletons.output
+    output: "msf/derep_sorted.msf"
+    shell: "/Users/brandon/Downloads/bio/preprocess/tools/clustalo --force --output-order=input-order -i {input} -o {output} --outfmt=msf -v"
+
+rule mafft:
+    input: rules.extract_seq.output.pep
+    output: "msf/down.pep.mafft"
+    shell: "mafft --auto {input} > {output}"
+
+rule sumatra:
+    input: rules.extract_seq.output.dna
+    output: "cluster/sumatra.txt"
+    params: ident = config['sumatra']['ident']
+    shell: "/Users/brandon/Downloads/bio/preprocess/tools/sumatra_v1.0.20/sumatra -t {params.ident} {input} > {output}" 
+
+rule sumaclust:
+    input: rules.extract_seq.output.dna
+    output: "cluster/sumaclust.fa"
+    params: ident = config['sumatra']['ident']
+    shell: "/Users/brandon/Downloads/bio/preprocess/tools/sumaclust_v1.0.20/sumaclust  -e -t {params.ident} -B {output}.biom {input} > {output}" 
+
+rule clustalo_dna:
+    input: rules.extract_seq.output.dna
+    output: "msf/down.dna.msf"
+    shell: "/Users/brandon/Downloads/bio/preprocess/tools/clustalo --force --output-order=input-order -i {input} -o {output} --outfmt=msf -v"
+
+
+rule t_coffe:
+    input: rules.extract_seq.output.dna
+    threads: config['t-coffee']['thread']
+    shell: "t_coffee -in {input} -output=clustalw,msf,phylip,score_html -case=upper -n_core={threads} -outorder=aligned -master /Users/brandon/Downloads/bio/preprocess/script/data/master.fa" 
+
+#rule translatorx:
+#    input:
+#        "geneSeqInfo.targetGene.vsearch"
+#    output:
+#        "geneSeqInfo.targetGene.vsearch.translatorx.out"
+#    shell:
+#        "perl translatorx_vLocal.pl -i {input} -o {output} -p M -t F -w 1 -c 5"
+
